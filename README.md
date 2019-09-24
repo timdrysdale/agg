@@ -15,7 +15,7 @@ Intended as a library for use by timdrysdale/vw
 1. Stream: an aggregrate of messages that are sourced from one or more feeds (e.g. audio and video from a camera)
 2. Destination: an endpoint that sources/sinks the messages in a stream (e.g. a data relay for a combined audio/video feed)
 
-Note that streams can work in reverse, where an incoming message from a destination is broadcast to each endpoint that provides a feed
+Note that streams can NOT work in reverse; i.e. incoming messages from the stream destination are NOT distributed to subClients.
 
 ## Operation
 

@@ -1,6 +1,10 @@
 package agg
 
-import "github.com/timdrysdale/hub"
+import (
+	"sync"
+
+	"github.com/timdrysdale/hub"
+)
 
 type Hub struct {
 	Hub        *hub.Hub
@@ -11,10 +15,16 @@ type Hub struct {
 	Delete     chan Rule
 	Rules      map[string][]string
 	Streams    map[string]map[*hub.Client]bool
-	SubClients map[*hub.Client]map[*hub.Client]bool
+	SubClients map[*hub.Client]map[*SubClient]bool
 }
 
 type Rule struct {
 	Stream string
 	Feeds  []string
+}
+
+type SubClient struct {
+	Client  *hub.Client
+	Stopped chan struct{}
+	Wg      *sync.WaitGroup
 }

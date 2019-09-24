@@ -285,13 +285,15 @@ func TestAddRuleAddStream(t *testing.T) {
 
 	//Check client is registered to feeds
 
+	listOfSubClients := h.SubClients[c] //save for post unregister test
+
 	isFound := make([]bool, len(feeds))
 
 	for i, feed := range feeds {
 
-		for subclient := range h.SubClients[c] {
+		for subclient := range listOfSubClients {
 
-			if _, ok := h.Hub.Clients[feed][subclient]; ok {
+			if _, ok := h.Hub.Clients[feed][subclient.Client]; ok {
 				isFound[i] = true
 			}
 		}
@@ -302,6 +304,31 @@ func TestAddRuleAddStream(t *testing.T) {
 			t.Error("did not find subclient for", feeds[i])
 		}
 	}
+
+	// unregister client
+
+	h.Unregister <- c
+
+	time.Sleep(time.Millisecond)
+
+	isFound = make([]bool, len(feeds))
+
+	for i, feed := range feeds {
+
+		for subclient := range listOfSubClients {
+
+			if _, ok := h.Hub.Clients[feed][subclient.Client]; ok {
+				isFound[i] = true
+			}
+		}
+	}
+
+	for i, val := range isFound {
+		if val {
+			t.Error("after unregistering, found subclient for", feeds[i])
+		}
+	}
+
 	close(closed)
 
 }

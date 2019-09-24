@@ -2,6 +2,7 @@ package agg
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/jinzhu/copier"
 	"github.com/timdrysdale/hub"
@@ -15,7 +16,7 @@ func New() *Hub {
 		Register:   make(chan *hub.Client),
 		Unregister: make(chan *hub.Client),
 		Streams:    make(map[string]map[*hub.Client]bool),
-		SubClients: make(map[*hub.Client]map[*hub.Client]bool),
+		SubClients: make(map[*hub.Client]map[*SubClient]bool),
 		Rules:      make(map[string][]string),
 		Add:        make(chan Rule),
 		Delete:     make(chan Rule),
@@ -41,15 +42,19 @@ func (h *Hub) Run(closed chan struct{}) {
 
 				// register the client to any feeds currently set by stream rule
 				if feeds, ok := h.Rules[client.Topic]; ok {
-					h.SubClients[client] = make(map[*hub.Client]bool)
+					h.SubClients[client] = make(map[*SubClient]bool)
+					wg := &sync.WaitGroup{}
 					for _, feed := range feeds {
 						// create and store the subclients we will register with the hub
-						subClient := &hub.Client{}
-						copier.Copy(&subClient, client)
-						subClient.Topic = feed
-						subClient.Send = client.Send
+						subClient := &SubClient{Client: &hub.Client{}, Wg: wg}
+						copier.Copy(&subClient.Client, client)
+						subClient.Client.Topic = feed
+						subClient.Client.Send = make(chan hub.Message)
+						subClient.Stopped = make(chan struct{})
 						h.SubClients[client][subClient] = true
-						h.Hub.Register <- subClient
+						wg.Add(1)
+						go subClient.RelayTo(client)
+						h.Hub.Register <- subClient.Client
 					}
 
 				}
@@ -59,22 +64,25 @@ func (h *Hub) Run(closed chan struct{}) {
 			}
 		case client := <-h.Unregister:
 			if strings.HasPrefix(client.Topic, "/stream/") {
+				// unregister any subclients that are registered to feeds
+				wg := &sync.WaitGroup{}
+				for subClient := range h.SubClients[client] {
+					h.Hub.Unregister <- subClient.Client
+					close(subClient.Stopped)
+					wg = subClient.Wg
+				}
+
+				wg.Wait() //same wg for all subclients
+
 				// delete the client from the stream
 				if _, ok := h.Streams[client.Topic]; ok {
 					delete(h.Streams[client.Topic], client)
 					close(client.Send)
 				}
-				// unregister the client from any feeds currently set by a rule
-				if feeds, ok := h.Rules[client.Topic]; ok {
-					for client, _ := range h.Streams[client.Topic] {
-						for _, feed := range feeds {
-							client.Topic = feed
-							h.Hub.Unregister <- client
-						}
-					}
-				}
+				delete(h.SubClients, client)
+
 			} else {
-				// unregister client normally
+				// unregister client directly
 				h.Hub.Unregister <- client
 			}
 		case msg := <-h.Broadcast:
@@ -83,39 +91,68 @@ func (h *Hub) Run(closed chan struct{}) {
 			h.Hub.Broadcast <- msg
 		case rule := <-h.Add:
 			// unregister clients from old feeds, if any
-			if feeds, ok := h.Rules[rule.Stream]; ok {
+			if _, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
-					for _, feed := range feeds {
-						client.Topic = feed
-						h.Hub.Unregister <- client
+					for subClient := range h.SubClients[client] {
+						h.Hub.Unregister <- subClient.Client
+						close(subClient.Stopped)
 					}
 				}
 			}
 			//set new rule
 			h.Rules[rule.Stream] = rule.Feeds
 
-			// register clients to new feeds
+			// register the clients to any feeds currently set by stream rule
 			if feeds, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
+					h.SubClients[client] = make(map[*SubClient]bool)
+					wg := &sync.WaitGroup{}
 					for _, feed := range feeds {
-						client.Topic = feed
-						h.Hub.Register <- client
+						// create and store the subclients we will register with the hub
+						subClient := &SubClient{Client: &hub.Client{}, Wg: wg}
+						copier.Copy(&subClient.Client, client)
+						subClient.Client.Topic = feed
+						subClient.Client.Send = make(chan hub.Message)
+						subClient.Stopped = make(chan struct{})
+						h.SubClients[client][subClient] = true
+						wg.Add(1)
+						go subClient.RelayTo(client)
+						h.Hub.Register <- subClient.Client
 					}
 				}
 			}
 
 		case rule := <-h.Delete:
 			// unregister clients from old feeds, if any
-			if feeds, ok := h.Rules[rule.Stream]; ok {
+			if _, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
-					for _, feed := range feeds {
-						client.Topic = feed
-						h.Hub.Unregister <- client
+					for subClient := range h.SubClients[client] {
+						h.Hub.Unregister <- subClient.Client
+						close(subClient.Stopped)
 					}
 				}
 			}
+
 			// delete rule
 			delete(h.Rules, rule.Stream)
+		}
+	}
+}
+
+//type SubClient struct {
+//	Client  *hub.Client
+//	Stopped chan struct{}
+//}
+
+// relay messages from subClient to Client
+func (sc *SubClient) RelayTo(c *hub.Client) {
+	defer sc.Wg.Done()
+	for {
+		select {
+		case <-sc.Stopped:
+			break
+		case msg := <-sc.Client.Send:
+			c.Send <- msg
 		}
 	}
 }
