@@ -10,7 +10,7 @@ type Hub struct {
 	Add        chan Rule
 	Delete     chan Rule
 	Rules      map[string][]string
-	Clients    map[string]map[*hub.Client]bool
+	Streams    map[string]map[*hub.Client]bool
 }
 
 type Rule struct {

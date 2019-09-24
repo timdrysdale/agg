@@ -23,7 +23,7 @@ func TestInstantiateHub(t *testing.T) {
 		t.Error("Hub.Unregister channel of wrong type")
 	}
 
-	if reflect.TypeOf(h.Clients) != reflect.TypeOf(make(map[string]map[*hub.Client]bool)) {
+	if reflect.TypeOf(h.Streams) != reflect.TypeOf(make(map[string]map[*hub.Client]bool)) {
 		t.Error("Hub.Broadcast channel of wrong type")
 	}
 
@@ -139,4 +139,108 @@ func TestSendMessage(t *testing.T) {
 		t.Error("Receiver did not receive message in correct quantity, wanted 1 got ", rxCount)
 	}
 	close(closed)
+}
+
+func TestRegisterStreamNoRule(t *testing.T) {
+
+	topic := "/stream/video0"
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Streams[topic][c]; !ok {
+		t.Error("Stream not registered in topic")
+	} else if val == false {
+		t.Error("Stream registered but not made true in map")
+	}
+	close(closed)
+}
+
+func TestUnRegisterStreamNoRule(t *testing.T) {
+
+	topic := "/stream/video0"
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Streams[topic][c]; !ok {
+		t.Error("Stream not registered in topic")
+	} else if val == false {
+		t.Error("Client registered but not made true in map")
+	}
+
+	time.Sleep(time.Millisecond)
+	h.Unregister <- c
+	time.Sleep(time.Millisecond)
+	if val, ok := h.Streams[topic][c]; ok {
+		if val {
+			t.Error("Stream still registered")
+		}
+	}
+	close(closed)
+}
+
+func TestAddRuleNoStream(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+
+	stream := "/stream/large"
+	feeds := []string{"video0", "audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Rules[stream]; !ok {
+		t.Error("Rule not registered in Rules")
+
+	} else if len(val) != len(feeds) {
+		t.Error("Rule has incorrect number of feeds")
+	}
+	close(closed)
+
+}
+
+func TestDeleteRuleNoStream(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+
+	stream := "/stream/large"
+	feeds := []string{"video0", "audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Rules[stream]; !ok {
+		t.Error("Rule not registered in Rules")
+
+	} else if len(val) != len(feeds) {
+		t.Error("Rule has incorrect number of feeds")
+	}
+	close(closed)
+
+	h.Delete <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if _, ok := h.Rules[stream]; ok {
+		t.Error("Rule still registered in Rules")
+
+	}
+
 }
