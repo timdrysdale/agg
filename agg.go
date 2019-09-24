@@ -139,11 +139,6 @@ func (h *Hub) Run(closed chan struct{}) {
 	}
 }
 
-//type SubClient struct {
-//	Client  *hub.Client
-//	Stopped chan struct{}
-//}
-
 // relay messages from subClient to Client
 func (sc *SubClient) RelayTo(c *hub.Client) {
 	defer sc.Wg.Done()

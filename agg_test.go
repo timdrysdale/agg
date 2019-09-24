@@ -246,7 +246,7 @@ func TestDeleteRuleNoStream(t *testing.T) {
 
 }
 
-func TestAddRuleAddStream(t *testing.T) {
+func TestAddRuleAddDeleteStream(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
 	go h.Run(closed)
@@ -327,6 +327,103 @@ func TestAddRuleAddStream(t *testing.T) {
 		if val {
 			t.Error("after unregistering, found subclient for", feeds[i])
 		}
+	}
+
+	close(closed)
+
+}
+
+func TestStreamGetsFeedMessges(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+
+	// add rule
+	stream := "/stream/large"
+
+	feeds := []string{"/video0", "/audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	// register client to stream
+	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: stream, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c
+
+	// add feeds
+	topic1 := "/video0"
+	c1 := &hub.Client{Hub: h.Hub, Name: "1", Topic: topic1, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	topic2 := "/audio"
+	c2 := &hub.Client{Hub: h.Hub, Name: "2", Topic: topic2, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	topic3 := "/nothing"
+	c3 := &hub.Client{Hub: h.Hub, Name: "3", Topic: topic3, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c1
+	h.Register <- c2
+	h.Register <- c3
+
+	content := []byte{'t', 'e', 's', 't'}
+
+	m1 := &hub.Message{Data: content, Sender: *c1, Sent: time.Now(), Type: 0}
+	m2 := &hub.Message{Data: content, Sender: *c2, Sent: time.Now(), Type: 0}
+
+	var start time.Time
+
+	rxCount := 0
+
+	rx_from_c1 := false
+	rx_from_c2 := false
+
+	go func() {
+		timer := time.NewTimer(5 * time.Millisecond)
+	COLLECT:
+		for {
+			select {
+			case <-c1.Send:
+				t.Error("Sender c1 received echo")
+			case <-c2.Send:
+				t.Error("Sender c2 received echo")
+			case <-c3.Send:
+				t.Error("Wrong client received message")
+			case msg := <-c.Send:
+				elapsed := time.Since(start)
+				if elapsed > (time.Millisecond) {
+					t.Error("Message took longer than 1 millisecond, ", elapsed)
+				}
+				rxCount++
+				if bytes.Compare(msg.Data, content) != 0 {
+					t.Error("Wrong data in message")
+				}
+				if msg.Sender == *c1 {
+					rx_from_c1 = true
+				}
+				if msg.Sender == *c2 {
+					rx_from_c2 = true
+				}
+			case <-c3.Send:
+				t.Error("Wrong client received message")
+			case <-timer.C:
+				break COLLECT
+			}
+		}
+	}()
+
+	time.Sleep(time.Millisecond)
+	start = time.Now()
+	h.Broadcast <- *m1
+	h.Broadcast <- *m2
+	time.Sleep(time.Millisecond)
+	if rxCount != 2 {
+		t.Error("Receiver did not receive message in correct quantity, wanted 2 got ", rxCount)
+	}
+	if !rx_from_c1 {
+		t.Error("Did not get message from c1")
+	}
+	if !rx_from_c2 {
+		t.Error("Did not get message from c2")
 	}
 
 	close(closed)
