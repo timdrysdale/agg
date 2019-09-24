@@ -146,8 +146,10 @@ func (sc *SubClient) RelayTo(c *hub.Client) {
 		select {
 		case <-sc.Stopped:
 			break
-		case msg := <-sc.Client.Send:
-			c.Send <- msg
+		case msg, ok := <-sc.Client.Send:
+			if ok {
+				c.Send <- msg
+			}
 		}
 	}
 }

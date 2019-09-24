@@ -429,3 +429,127 @@ func TestStreamGetsFeedMessges(t *testing.T) {
 	close(closed)
 
 }
+
+func TestStreamWithRuleChange(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+
+	// add rule
+	stream := "/stream/large"
+
+	feeds := []string{"/video0", "/audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	// register client to stream
+	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: stream, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c
+
+	// add feeds
+	topic1 := "/video0"
+	c1 := &hub.Client{Hub: h.Hub, Name: "1", Topic: topic1, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	topic2 := "/audio"
+	c2 := &hub.Client{Hub: h.Hub, Name: "2", Topic: topic2, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	topic3 := "/nothing"
+	c3 := &hub.Client{Hub: h.Hub, Name: "3", Topic: topic3, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c1
+	h.Register <- c2
+	h.Register <- c3
+
+	content := []byte{'t', 'e', 's', 't'}
+
+	m1 := &hub.Message{Data: content, Sender: *c1, Sent: time.Now(), Type: 0}
+	m2 := &hub.Message{Data: content, Sender: *c2, Sent: time.Now(), Type: 0}
+	m3 := &hub.Message{Data: content, Sender: *c3, Sent: time.Now(), Type: 0}
+
+	var start time.Time
+
+	rxCount := 0
+
+	rx_from_c1 := false
+	rx_from_c2 := false
+	rx_from_c3 := false
+
+	stopRx := make(chan struct{})
+
+	go func() {
+		timer := time.NewTimer(10 * time.Millisecond)
+	COLLECT:
+		for {
+			select {
+			case <-stopRx:
+				break COLLECT
+			case <-c1.Send:
+				t.Error("Sender c1 received echo")
+			case <-c2.Send:
+				t.Error("Sender c2 received echo")
+			case <-c3.Send:
+				t.Error("Wrong client received message")
+			case msg := <-c.Send:
+				elapsed := time.Since(start)
+				if elapsed > (3 * time.Millisecond) {
+					t.Error("Message took longer than 5 millisecond, ", elapsed)
+				}
+				rxCount++
+				if bytes.Compare(msg.Data, content) != 0 {
+					t.Error("Wrong data in message", msg.Sender.Topic, len(msg.Data))
+				}
+				if msg.Sender == *c1 {
+					rx_from_c1 = true
+				}
+				if msg.Sender == *c2 {
+					rx_from_c2 = true
+				}
+				if msg.Sender == *c3 {
+					rx_from_c3 = true
+				}
+			case <-c3.Send:
+				t.Error("Wrong client received message")
+			case <-timer.C:
+				break COLLECT
+			}
+		}
+	}()
+
+	time.Sleep(time.Millisecond)
+
+	start = time.Now()
+	h.Broadcast <- *m1
+	h.Broadcast <- *m2
+	h.Broadcast <- *m3
+
+	time.Sleep(time.Millisecond)
+
+	feeds = []string{"/nothing"}
+	r = &Rule{Stream: stream, Feeds: feeds}
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+	h.Broadcast <- *m1
+	h.Broadcast <- *m2
+	h.Broadcast <- *m3
+
+	time.Sleep(time.Millisecond)
+	close(stopRx)
+
+	if rxCount != 3 {
+		t.Error("Receiver did not receive message in correct quantity, wanted 3 got ", rxCount)
+	}
+	if !rx_from_c1 {
+		t.Error("Did not get message from c1")
+	}
+	if !rx_from_c2 {
+		t.Error("Did not get message from c2")
+	}
+	if !rx_from_c3 {
+		t.Error("Did not get message from c3")
+	}
+	close(closed)
+
+}
