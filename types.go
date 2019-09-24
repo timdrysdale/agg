@@ -11,6 +11,7 @@ type Hub struct {
 	Delete     chan Rule
 	Rules      map[string][]string
 	Streams    map[string]map[*hub.Client]bool
+	SubClients map[*hub.Client]map[*hub.Client]bool
 }
 
 type Rule struct {

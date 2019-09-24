@@ -3,6 +3,7 @@ package agg
 import (
 	"strings"
 
+	"github.com/jinzhu/copier"
 	"github.com/timdrysdale/hub"
 )
 
@@ -14,6 +15,7 @@ func New() *Hub {
 		Register:   make(chan *hub.Client),
 		Unregister: make(chan *hub.Client),
 		Streams:    make(map[string]map[*hub.Client]bool),
+		SubClients: make(map[*hub.Client]map[*hub.Client]bool),
 		Rules:      make(map[string][]string),
 		Add:        make(chan Rule),
 		Delete:     make(chan Rule),
@@ -39,15 +41,20 @@ func (h *Hub) Run(closed chan struct{}) {
 
 				// register the client to any feeds currently set by stream rule
 				if feeds, ok := h.Rules[client.Topic]; ok {
-					for client, _ := range h.Streams[client.Topic] {
-						for _, feed := range feeds {
-							client.Topic = feed
-							h.Hub.Register <- client
-						}
+					h.SubClients[client] = make(map[*hub.Client]bool)
+					for _, feed := range feeds {
+						// create and store the subclients we will register with the hub
+						subClient := &hub.Client{}
+						copier.Copy(&subClient, client)
+						subClient.Topic = feed
+						subClient.Send = client.Send
+						h.SubClients[client][subClient] = true
+						h.Hub.Register <- subClient
 					}
+
 				}
 			} else {
-				// register client normally
+				// register client directly
 				h.Hub.Register <- client
 			}
 		case client := <-h.Unregister:
