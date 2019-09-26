@@ -27,7 +27,22 @@ func New() *Hub {
 }
 
 func (h *Hub) Run(closed chan struct{}) {
-	go h.Hub.Run(closed) //start the hub
+	h.RunOptionalStats(closed, false)
+}
+
+func (h *Hub) RunWithStats(closed chan struct{}) {
+	h.RunOptionalStats(closed, true)
+}
+
+func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
+
+	//start the hub
+	if withStats {
+		go h.Hub.RunWithStats(closed)
+	} else {
+		go h.Hub.Run(closed)
+	}
+
 	for {
 		select {
 		case <-closed:
