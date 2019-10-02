@@ -105,6 +105,11 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			// note that non-responsive clients will get deleted
 			h.Hub.Broadcast <- msg
 		case rule := <-h.Add:
+
+			if rule.Stream == "deleteAll" {
+				break //reserved ID for deleting all rules
+			}
+
 			// unregister clients from old feeds, if any
 			if _, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
@@ -138,18 +143,33 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			}
 
 		case stream := <-h.Delete:
-			// unregister clients from old feeds, if any
-			if _, ok := h.Rules[stream]; ok {
-				for client, _ := range h.Streams[stream] {
-					for subClient := range h.SubClients[client] {
-						h.Hub.Unregister <- subClient.Client
-						close(subClient.Stopped)
+
+			if stream == "deleteAll" { //all streams to be deleted
+
+				for _, client := range h.SubClients {
+					for subclient := range client { //h.SubClients[client] {
+						h.Hub.Unregister <- subclient.Client
+						close(subclient.Stopped)
 					}
 				}
-			}
 
-			// delete rule
-			delete(h.Rules, stream)
+				h.Rules = make(map[string][]string)
+
+			} else { //single stream
+
+				// unregister clients from old feeds, if any
+				if _, ok := h.Rules[stream]; ok {
+					for client, _ := range h.Streams[stream] {
+						for subClient := range h.SubClients[client] {
+							h.Hub.Unregister <- subClient.Client
+							close(subClient.Stopped)
+						}
+					}
+				}
+
+				// delete rule
+				delete(h.Rules, stream)
+			}
 		}
 	}
 }

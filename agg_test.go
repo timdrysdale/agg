@@ -154,6 +154,8 @@ func TestRegisterStreamNoRule(t *testing.T) {
 	topic := "/stream/video0"
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
+
 	go h.Run(closed)
 	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
@@ -166,7 +168,7 @@ func TestRegisterStreamNoRule(t *testing.T) {
 	} else if val == false {
 		t.Error("Stream registered but not made true in map")
 	}
-	close(closed)
+
 }
 
 func TestUnRegisterStreamNoRule(t *testing.T) {
@@ -174,6 +176,8 @@ func TestUnRegisterStreamNoRule(t *testing.T) {
 	topic := "/stream/video0"
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
+
 	go h.Run(closed)
 	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
@@ -195,12 +199,14 @@ func TestUnRegisterStreamNoRule(t *testing.T) {
 			t.Error("Stream still registered")
 		}
 	}
-	close(closed)
+
 }
 
 func TestAddRuleNoStream(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
+
 	go h.Run(closed)
 
 	stream := "/stream/large"
@@ -217,15 +223,33 @@ func TestAddRuleNoStream(t *testing.T) {
 	} else if len(val) != len(feeds) {
 		t.Error("Rule has incorrect number of feeds")
 	}
-	close(closed)
 
+}
+
+func TestCannotAddRuleDeleteAll(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	defer close(closed)
+	go h.Run(closed)
+
+	stream := "deleteAll"
+	feeds := []string{"video0", "audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if _, ok := h.Rules[stream]; ok {
+		t.Error("Rule called deleteAll incorrectly accepted for registering in Rules")
+	}
 }
 
 func TestDeleteRuleNoStream(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
 	go h.Run(closed)
-
+	defer close(closed)
 	stream := "/stream/large"
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
@@ -250,13 +274,73 @@ func TestDeleteRuleNoStream(t *testing.T) {
 
 	}
 
-	close(closed)
+}
+
+func TestDeleteAllRules(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	defer close(closed)
+	go h.Run(closed)
+
+	stream0 := "/stream/large"
+	feeds := []string{"video0", "audio"}
+	r := &Rule{Stream: stream0, Feeds: feeds}
+
+	h.Add <- *r
+
+	stream1 := "/stream/medium"
+	feeds = []string{"video1", "audio"}
+	r = &Rule{Stream: stream1, Feeds: feeds}
+
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Rules[stream0]; !ok {
+		t.Error("Rule not registered in Rules")
+
+	} else if len(val) != len(feeds) {
+		t.Error("Rule has incorrect number of feeds")
+	}
+	// register client to stream
+	c0 := &hub.Client{Hub: h.Hub, Name: "a0", Topic: stream0, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+	h.Register <- c0
+	c1 := &hub.Client{Hub: h.Hub, Name: "a1", Topic: stream1, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+	h.Register <- c1
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Streams[stream0][c0]; !ok {
+		t.Error("Stream not registered in topic")
+	} else if val == false {
+		t.Error("Stream registered but not made true in map")
+	}
+	if val, ok := h.Streams[stream1][c1]; !ok {
+		t.Error("Stream not registered in topic")
+	} else if val == false {
+		t.Error("Stream registered but not made true in map")
+	}
+
+	time.Sleep(time.Millisecond)
+
+	h.Delete <- "deleteAll"
+
+	time.Sleep(time.Millisecond)
+
+	if _, ok := h.Rules[stream0]; ok {
+		t.Error("Rule still registered in Rules")
+
+	}
+	if _, ok := h.Rules[stream1]; ok {
+		t.Error("Rule still registered in Rules")
+
+	}
 
 }
 
 func TestAddRuleAddDeleteStream(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
 	go h.Run(closed)
 
 	// add rule
@@ -336,14 +420,12 @@ func TestAddRuleAddDeleteStream(t *testing.T) {
 			t.Error("after unregistering, found subclient for", feeds[i])
 		}
 	}
-
-	close(closed)
-
 }
 
 func TestAddRuleAddStreamDeleteRule(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
 	go h.Run(closed)
 
 	// add rule
@@ -423,14 +505,12 @@ func TestAddRuleAddStreamDeleteRule(t *testing.T) {
 			t.Error("after deleting rule, found subclient for", feeds[i])
 		}
 	}
-
-	close(closed)
-
 }
 
 func TestStreamGetsFeedMessges(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
 	go h.Run(closed)
 
 	// add rule
@@ -520,14 +600,12 @@ func TestStreamGetsFeedMessges(t *testing.T) {
 	if !rx_from_c2 {
 		t.Error("Did not get message from c2")
 	}
-
-	close(closed)
-
 }
 
 func TestStreamWithRuleChange(t *testing.T) {
 	h := New()
 	closed := make(chan struct{})
+	defer close(closed)
 	go h.Run(closed)
 
 	// add rule
@@ -645,6 +723,4 @@ func TestStreamWithRuleChange(t *testing.T) {
 	if !rx_from_c3 {
 		t.Error("Did not get message from c3")
 	}
-	close(closed)
-
 }
