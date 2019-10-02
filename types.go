@@ -19,8 +19,8 @@ type Hub struct {
 }
 
 type Rule struct {
-	Stream string
-	Feeds  []string
+	Stream string   `json:"stream"`
+	Feeds  []string `json:"feeds"`
 }
 
 type SubClient struct {
