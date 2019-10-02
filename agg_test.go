@@ -241,7 +241,7 @@ func TestDeleteRuleNoStream(t *testing.T) {
 		t.Error("Rule has incorrect number of feeds")
 	}
 
-	h.Delete <- *r
+	h.Delete <- (*r).Stream
 
 	time.Sleep(time.Millisecond)
 
@@ -402,7 +402,7 @@ func TestAddRuleAddStreamDeleteRule(t *testing.T) {
 
 	// delete Rule
 
-	h.Delete <- *r
+	h.Delete <- (*r).Stream
 
 	time.Sleep(time.Millisecond)
 

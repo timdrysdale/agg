@@ -12,7 +12,7 @@ type Hub struct {
 	Register   chan *hub.Client
 	Unregister chan *hub.Client
 	Add        chan Rule
-	Delete     chan Rule
+	Delete     chan string
 	Rules      map[string][]string
 	Streams    map[string]map[*hub.Client]bool
 	SubClients map[*hub.Client]map[*SubClient]bool

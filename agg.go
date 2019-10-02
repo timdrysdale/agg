@@ -19,7 +19,7 @@ func New() *Hub {
 		SubClients: make(map[*hub.Client]map[*SubClient]bool),
 		Rules:      make(map[string][]string),
 		Add:        make(chan Rule),
-		Delete:     make(chan Rule),
+		Delete:     make(chan string),
 	}
 
 	return h
@@ -137,10 +137,10 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 				}
 			}
 
-		case rule := <-h.Delete:
+		case stream := <-h.Delete:
 			// unregister clients from old feeds, if any
-			if _, ok := h.Rules[rule.Stream]; ok {
-				for client, _ := range h.Streams[rule.Stream] {
+			if _, ok := h.Rules[stream]; ok {
+				for client, _ := range h.Streams[stream] {
 					for subClient := range h.SubClients[client] {
 						h.Hub.Unregister <- subClient.Client
 						close(subClient.Stopped)
@@ -149,7 +149,7 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			}
 
 			// delete rule
-			delete(h.Rules, rule.Stream)
+			delete(h.Rules, stream)
 		}
 	}
 }
