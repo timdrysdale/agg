@@ -2,6 +2,7 @@ package agg
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -34,23 +35,31 @@ func TestInstantiateHub(t *testing.T) {
 }
 
 func TestRegisterClient(t *testing.T) {
+	// also exercises the RunWithStats path
+	for i := 0; i < 2; i++ {
+		topic := "/video0"
+		h := New()
+		closed := make(chan struct{})
 
-	topic := "/video0"
-	h := New()
-	closed := make(chan struct{})
-	go h.Run(closed)
-	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+		if i == 0 {
+			go h.Run(closed)
+		} else {
+			go h.RunWithStats(closed)
+		}
 
-	h.Register <- c
+		c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: topic, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
-	time.Sleep(time.Millisecond)
+		h.Register <- c
 
-	if val, ok := h.Hub.Clients[topic][c]; !ok {
-		t.Error("Client not registered in topic")
-	} else if val == false {
-		t.Error("Client registered but not made true in map")
+		time.Sleep(time.Millisecond)
+
+		if val, ok := h.Hub.Clients[topic][c]; !ok {
+			t.Error("Client not registered in topic")
+		} else if val == false {
+			t.Error("Client registered but not made true in map")
+		}
+		close(closed)
 	}
-	close(closed)
 }
 
 func TestUnRegisterClient(t *testing.T) {
@@ -326,6 +335,94 @@ func TestAddRuleAddDeleteStream(t *testing.T) {
 	for i, val := range isFound {
 		if val {
 			t.Error("after unregistering, found subclient for", feeds[i])
+		}
+	}
+
+	close(closed)
+
+}
+
+func TestAddRuleAddStreamDeleteRule(t *testing.T) {
+	h := New()
+	closed := make(chan struct{})
+	go h.Run(closed)
+
+	// add rule
+	stream := "/stream/large"
+
+	feeds := []string{"video0", "audio"}
+	r := &Rule{Stream: stream, Feeds: feeds}
+
+	h.Add <- *r
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Rules[stream]; !ok {
+		t.Error("Rule not registered in Rules")
+
+	} else if len(val) != len(feeds) {
+		t.Error("Rule has incorrect number of feeds")
+	}
+
+	// register client to stream
+	c := &hub.Client{Hub: h.Hub, Name: "aa", Topic: stream, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
+
+	h.Register <- c
+
+	time.Sleep(time.Millisecond)
+
+	if val, ok := h.Streams[stream][c]; !ok {
+		t.Error("Stream not registered in topic")
+	} else if val == false {
+		t.Error("Stream registered but not made true in map")
+	}
+
+	time.Sleep(time.Millisecond)
+
+	//Check client is registered to feeds
+
+	listOfSubClients := h.SubClients[c] //save for post unregister test
+
+	isFound := make([]bool, len(feeds))
+
+	for i, feed := range feeds {
+
+		for subclient := range listOfSubClients {
+
+			if _, ok := h.Hub.Clients[feed][subclient.Client]; ok {
+				isFound[i] = true
+				fmt.Println("*******FOUND SUBCLIENT*****")
+			}
+		}
+	}
+
+	for i, val := range isFound {
+		if !val {
+			t.Error("did not find subclient for", feeds[i])
+		}
+	}
+
+	// delete Rule
+
+	h.Delete <- *r
+
+	time.Sleep(time.Millisecond)
+
+	isFound = make([]bool, len(feeds))
+
+	for i, feed := range feeds {
+
+		for subclient := range listOfSubClients {
+
+			if _, ok := h.Hub.Clients[feed][subclient.Client]; ok {
+				isFound[i] = true
+			}
+		}
+	}
+
+	for i, val := range isFound {
+		if val {
+			t.Error("after deleting rule, found subclient for", feeds[i])
 		}
 	}
 
