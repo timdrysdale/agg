@@ -2,7 +2,6 @@ package agg
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -391,7 +390,6 @@ func TestAddRuleAddStreamDeleteRule(t *testing.T) {
 
 			if _, ok := h.Hub.Clients[feed][subclient.Client]; ok {
 				isFound[i] = true
-				fmt.Println("*******FOUND SUBCLIENT*****")
 			}
 		}
 	}

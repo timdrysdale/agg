@@ -1,7 +1,6 @@
 package agg
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 
@@ -49,9 +48,7 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 		case <-closed:
 			return
 		case client := <-h.Register:
-			fmt.Println("agg REGISTER")
 			if strings.HasPrefix(client.Topic, "/stream/") {
-				fmt.Println("agg registering for stream")
 				// register the client to the stream
 				if _, ok := h.Streams[client.Topic]; !ok {
 					h.Streams[client.Topic] = make(map[*hub.Client]bool)
@@ -79,10 +76,8 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			} else {
 				// register client directly
 				h.Hub.Register <- client
-				fmt.Println("agg registering for direct")
 			}
 		case client := <-h.Unregister:
-			fmt.Println("agg unregistering")
 			if strings.HasPrefix(client.Topic, "/stream/") {
 				// unregister any subclients that are registered to feeds
 				wg := &sync.WaitGroup{}
@@ -106,8 +101,6 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 				h.Hub.Unregister <- client
 			}
 		case msg := <-h.Broadcast:
-			fmt.Println("agg got message to broadcast")
-			fmt.Printf("agg current subclients: %v\n", h.SubClients)
 			// defer handling to hub
 			// note that non-responsive clients will get deleted
 			h.Hub.Broadcast <- msg
@@ -170,7 +163,6 @@ func (sc *SubClient) RelayTo(c *hub.Client) {
 			break
 		case msg, ok := <-sc.Client.Send:
 			if ok {
-				fmt.Println("agg subclient RelayTo")
 				c.Send <- msg
 			}
 		}
