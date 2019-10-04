@@ -48,7 +48,7 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 		case <-closed:
 			return
 		case client := <-h.Register:
-			if strings.HasPrefix(client.Topic, "/stream/") {
+			if strings.HasPrefix(client.Topic, "stream/") {
 				// register the client to the stream
 				if _, ok := h.Streams[client.Topic]; !ok {
 					h.Streams[client.Topic] = make(map[*hub.Client]bool)
@@ -78,7 +78,7 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 				h.Hub.Register <- client
 			}
 		case client := <-h.Unregister:
-			if strings.HasPrefix(client.Topic, "/stream/") {
+			if strings.HasPrefix(client.Topic, "stream/") {
 				// unregister any subclients that are registered to feeds
 				wg := &sync.WaitGroup{}
 				for subClient := range h.SubClients[client] {

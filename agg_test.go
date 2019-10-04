@@ -151,7 +151,7 @@ func TestSendMessage(t *testing.T) {
 
 func TestRegisterStreamNoRule(t *testing.T) {
 
-	topic := "/stream/video0"
+	topic := "stream/video0"
 	h := New()
 	closed := make(chan struct{})
 	defer close(closed)
@@ -173,7 +173,7 @@ func TestRegisterStreamNoRule(t *testing.T) {
 
 func TestUnRegisterStreamNoRule(t *testing.T) {
 
-	topic := "/stream/video0"
+	topic := "stream/video0"
 	h := New()
 	closed := make(chan struct{})
 	defer close(closed)
@@ -209,7 +209,7 @@ func TestAddRuleNoStream(t *testing.T) {
 
 	go h.Run(closed)
 
-	stream := "/stream/large"
+	stream := "stream/large"
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
 
@@ -250,7 +250,7 @@ func TestDeleteRuleNoStream(t *testing.T) {
 	closed := make(chan struct{})
 	go h.Run(closed)
 	defer close(closed)
-	stream := "/stream/large"
+	stream := "stream/large"
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
 
@@ -282,13 +282,13 @@ func TestDeleteAllRules(t *testing.T) {
 	defer close(closed)
 	go h.Run(closed)
 
-	stream0 := "/stream/large"
+	stream0 := "stream/large"
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream0, Feeds: feeds}
 
 	h.Add <- *r
 
-	stream1 := "/stream/medium"
+	stream1 := "stream/medium"
 	feeds = []string{"video1", "audio"}
 	r = &Rule{Stream: stream1, Feeds: feeds}
 
@@ -344,7 +344,7 @@ func TestAddRuleAddDeleteStream(t *testing.T) {
 	go h.Run(closed)
 
 	// add rule
-	stream := "/stream/large"
+	stream := "stream/large"
 
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
@@ -429,7 +429,7 @@ func TestAddRuleAddStreamDeleteRule(t *testing.T) {
 	go h.Run(closed)
 
 	// add rule
-	stream := "/stream/large"
+	stream := "stream/large"
 
 	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
@@ -514,9 +514,9 @@ func TestStreamGetsFeedMessges(t *testing.T) {
 	go h.Run(closed)
 
 	// add rule
-	stream := "/stream/large"
+	stream := "stream/large"
 
-	feeds := []string{"/video0", "/audio"}
+	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
 
 	h.Add <- *r
@@ -527,13 +527,13 @@ func TestStreamGetsFeedMessges(t *testing.T) {
 	h.Register <- c
 
 	// add feeds
-	topic1 := "/video0"
+	topic1 := "video0"
 	c1 := &hub.Client{Hub: h.Hub, Name: "1", Topic: topic1, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
-	topic2 := "/audio"
+	topic2 := "audio"
 	c2 := &hub.Client{Hub: h.Hub, Name: "2", Topic: topic2, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
-	topic3 := "/nothing"
+	topic3 := "nothing"
 	c3 := &hub.Client{Hub: h.Hub, Name: "3", Topic: topic3, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
 	h.Register <- c1
@@ -609,9 +609,9 @@ func TestStreamWithRuleChange(t *testing.T) {
 	go h.Run(closed)
 
 	// add rule
-	stream := "/stream/large"
+	stream := "stream/large"
 
-	feeds := []string{"/video0", "/audio"}
+	feeds := []string{"video0", "audio"}
 	r := &Rule{Stream: stream, Feeds: feeds}
 
 	h.Add <- *r
@@ -622,13 +622,13 @@ func TestStreamWithRuleChange(t *testing.T) {
 	h.Register <- c
 
 	// add feeds
-	topic1 := "/video0"
+	topic1 := "video0"
 	c1 := &hub.Client{Hub: h.Hub, Name: "1", Topic: topic1, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
-	topic2 := "/audio"
+	topic2 := "audio"
 	c2 := &hub.Client{Hub: h.Hub, Name: "2", Topic: topic2, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
-	topic3 := "/nothing"
+	topic3 := "nothing"
 	c3 := &hub.Client{Hub: h.Hub, Name: "3", Topic: topic3, Send: make(chan hub.Message), Stats: hub.NewClientStats()}
 
 	h.Register <- c1
@@ -699,7 +699,7 @@ func TestStreamWithRuleChange(t *testing.T) {
 
 	time.Sleep(time.Millisecond)
 
-	feeds = []string{"/nothing"}
+	feeds = []string{"nothing"}
 	r = &Rule{Stream: stream, Feeds: feeds}
 	h.Add <- *r
 
