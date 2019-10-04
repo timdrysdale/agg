@@ -177,10 +177,11 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 // relay messages from subClient to Client
 func (sc *SubClient) RelayTo(c *hub.Client) {
 	defer sc.Wg.Done()
+LOOP:
 	for {
 		select {
 		case <-sc.Stopped:
-			break
+			break LOOP
 		case msg, ok := <-sc.Client.Send:
 			if ok {
 				c.Send <- msg
