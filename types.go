@@ -1,8 +1,6 @@
 package agg
 
 import (
-	"sync"
-
 	"github.com/timdrysdale/hub"
 )
 
@@ -26,5 +24,4 @@ type Rule struct {
 type SubClient struct {
 	Client  *hub.Client
 	Stopped chan struct{}
-	Wg      *sync.WaitGroup
 }
