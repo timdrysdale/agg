@@ -89,7 +89,7 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 				// delete the client from the stream
 				if _, ok := h.Streams[client.Topic]; ok {
 					delete(h.Streams[client.Topic], client)
-					close(client.Send)
+					//close(client.Send)
 				}
 				delete(h.SubClients, client)
 
