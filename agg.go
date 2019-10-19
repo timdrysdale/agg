@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/jinzhu/copier"
-	log "github.com/sirupsen/logrus"
 	"github.com/timdrysdale/hub"
 )
 
@@ -102,16 +101,13 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			// note that non-responsive clients will get deleted
 			h.Hub.Broadcast <- msg
 		case rule := <-h.Add:
-			log.Debug("________________________________________ADD RULE__________________")
 			if rule.Stream == "deleteAll" {
 				break //reserved ID for deleting all rules
 			}
-
 			// unregister clients from old feeds, if any
 			if _, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
 					for subClient := range h.SubClients[client] {
-						log.Debug("________________________________________UNREG CLIENT__________________")
 						h.Hub.Unregister <- subClient.Client
 						close(subClient.Stopped)
 					}
@@ -119,7 +115,6 @@ func (h *Hub) RunOptionalStats(closed chan struct{}, withStats bool) {
 			}
 			//set new rule
 			h.Rules[rule.Stream] = rule.Feeds
-
 			// register the clients to any feeds currently set by stream rule
 			if feeds, ok := h.Rules[rule.Stream]; ok {
 				for client, _ := range h.Streams[rule.Stream] {
